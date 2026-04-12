@@ -1,0 +1,17 @@
+name: Ping AutoRepoImprover
+
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Bot
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            https://api.github.com/repos/sonararadhya/maintenance-shadow-bot/dispatches \
+            -d '{"event_type":"trigger-readme-improve"}'
