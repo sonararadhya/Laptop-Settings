@@ -13,20 +13,25 @@ for arg in "$@"; do
 done
 
 # Colors for professional output
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
 # --- 2. Helper Functions ---
 log_info() { echo -e "${BLUE}[i]${NC} $1"; }
 log_ok()   { echo -e "${GREEN}[✓]${NC} $1"; }
+log_fail() { echo -e "${RED}[✗]${NC} $1"; }
 divider() { 
-    # Only print a divider if we are NOT in dry run, or just print to terminal
     echo -e "${CYAN}------------------------------------------------------------${NC}" 
 }
 
 section() {
     echo -e "\n${CYAN}${BOLD}[*] $1${NC}"
 }
-log_fail() { echo -e "${RED}[✗]${NC} $1"; }
 
 # Root check (Required for APT)
 if [[ $EUID -ne 0 ]]; then
@@ -55,21 +60,33 @@ for lock in "${LOCK_FILES[@]}"; do
         if [ -n "$pid" ]; then
             log_info "Lock detected on $lock (Held by PID: $pid)"
             
-            if [ "$DRY_RUN" = true ]; then
-                log_info "[DRY-RUN] Would terminate process $pid and remove lock."
+            # Verify the process is actually an APT/dpkg process
+            process_name=$(ps -p "$pid" -o comm= 2>/dev/null)
+            
+            if echo "$process_name" | grep -qE "apt|dpkg|aptitude|unattended"; then
+                if [ "$DRY_RUN" = true ]; then
+                    log_info "[DRY-RUN] Would terminate $process_name (PID: $pid) and remove lock."
+                else
+                    log_info "Attempting to safely terminate $process_name process $pid..."
+                    kill -15 "$pid" 2>/dev/null
+                    sleep 2
+                    # Force kill if still alive
+                    if ps -p "$pid" > /dev/null 2>&1; then
+                        kill -9 "$pid" 2>/dev/null
+                    fi
+                    rm -f "$lock"
+                    log_ok "Process terminated and lock removed: $lock"
+                fi
             else
-                log_info "Attempting to safely terminate process $pid..."
-                kill -15 "$pid" 2>/dev/null
-                sleep 2
-                # Force kill if still alive
-                kill -9 "$pid" 2>/dev/null
-                rm -f "$lock"
-                log_ok "Process terminated and lock removed: $lock"
+                log_fail "Lock held by non-APT process '$process_name' (PID: $pid). Skipping for safety."
+                log_info "Manual intervention may be required for: $lock"
             fi
         else
             # Stale lock: file exists but no process is using it
             log_ok "Removing stale lock file: $lock"
-            if [ "$DRY_RUN" = false ]; then rm -f "$lock"; fi
+            if [ "$DRY_RUN" = false ]; then 
+                rm -f "$lock"
+            fi
         fi
     fi
 done
@@ -85,8 +102,11 @@ if [ "$DRY_RUN" = true ]; then
     log_info "[DRY-RUN] Would run: dpkg --configure -a"
 else
     # --configure -a finishes installations that were stopped halfway
-    dpkg --configure -a 2>/dev/null
-    log_ok "Package database reconfigured."
+    if dpkg --configure -a; then
+        log_ok "Package database reconfigured."
+    else
+        log_fail "Some packages could not be reconfigured. Check output above."
+    fi
 fi
 
 # Task B: Clear partial/corrupt cache
@@ -96,8 +116,11 @@ if [ "$DRY_RUN" = true ]; then
 else
     # clean removes all the .deb files from /var/cache/apt/archives/
     # This is safe because it just forces a fresh download if needed
-    apt-get clean
-    log_ok "Download cache cleared."
+    if apt-get clean; then
+        log_ok "Download cache cleared."
+    else
+        log_fail "Failed to clear cache."
+    fi
 fi
 
 
@@ -112,16 +135,22 @@ if [ "$DRY_RUN" = true ]; then
 else
     # -f is 'fix-broken'. It tries to download missing pieces automatically.
     # -y assumes 'yes' to prompts so the script doesn't stop.
-    apt-get install -f -y 2>/dev/null
-    log_ok "Dependencies checked and healed."
+    if apt-get install -f -y; then
+        log_ok "Dependencies checked and healed."
+    else
+        log_fail "Some dependencies could not be fixed. Manual intervention may be required."
+    fi
 fi
 
 log_info "Refreshing repository metadata..."
 if [ "$DRY_RUN" = true ]; then
     log_info "[DRY-RUN] Would run: apt-get update"
 else
-    apt-get update 2>/dev/null
-    log_ok "Repository lists updated."
+    if apt-get update; then
+        log_ok "Repository lists updated."
+    else
+        log_fail "Failed to update repository lists."
+    fi
 fi
 
 
@@ -134,8 +163,11 @@ if [ "$DRY_RUN" = true ]; then
     log_info "[DRY-RUN] Would run: apt-get autoremove -y"
 else
     # autoremove deletes old kernels and libraries no longer needed
-    apt-get autoremove -y 2>/dev/null
-    log_ok "System cleaned of obsolete packages."
+    if apt-get autoremove -y; then
+        log_ok "System cleaned of obsolete packages."
+    else
+        log_fail "Failed to remove some packages."
+    fi
 fi
 
 echo -e "\n${BOLD}${GREEN}╔══════════════════════════════════════════════════════╗"
