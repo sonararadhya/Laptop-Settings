@@ -83,12 +83,11 @@ section "SCANNING FOR CORRUPT / MISIDENTIFIED FILES"
 
 declare -A CORRUPT_FILES   # path → detected_type
 
+# OPTIMIZATION: Ignore hidden folders (.git), recovery folder, and report files
 while IFS= read -r -d '' f; do
-    [[ "$f" == "$RECOVERY_DIR"* ]] && continue
-    [[ "$f" == "$REPORT"        ]] && continue
-
     detected=$(file --brief --mime-type "$f" 2>/dev/null)
     ext="${f##*.}"
+    ext="${ext,,}" # Normalize extension to lowercase
 
     echo "  Checking: $f  [$detected]" >> "$REPORT"
 
@@ -107,13 +106,14 @@ while IFS= read -r -d '' f; do
             CORRUPT_FILES["$f"]="empty" ;;
     esac
 
-    # Extension vs MIME mismatch
+    # Extension vs MIME mismatch (Expanded Support)
     case "$ext" in
         jpg|jpeg) [[ "$detected" != image/jpeg  ]] && CORRUPT_FILES["$f"]="$detected" ;;
         png)      [[ "$detected" != image/png   ]] && CORRUPT_FILES["$f"]="$detected" ;;
         gif)      [[ "$detected" != image/gif   ]] && CORRUPT_FILES["$f"]="$detected" ;;
         bmp)      [[ "$detected" != image/bmp   ]] && CORRUPT_FILES["$f"]="$detected" ;;
         webp)     [[ "$detected" != image/webp  ]] && CORRUPT_FILES["$f"]="$detected" ;;
+        heic|heif)[[ "$detected" != image/heic  ]] && CORRUPT_FILES["$f"]="$detected" ;;
         mp4|m4v)  [[ "$detected" != video/mp4   ]] && CORRUPT_FILES["$f"]="$detected" ;;
         avi)      [[ "$detected" != video/x-msvideo ]] && CORRUPT_FILES["$f"]="$detected" ;;
         mkv)      [[ "$detected" != video/x-matroska ]] && CORRUPT_FILES["$f"]="$detected" ;;
@@ -138,8 +138,11 @@ while IFS= read -r -d '' f; do
                       && CORRUPT_FILES["$f"]="$detected" ;;
     esac
 
-done < <(find "$TARGET_DIR" -maxdepth 6 -not -path "$RECOVERY_DIR/*" \
-             -not -name "recovery_report_*.txt" -type f -print0 2>/dev/null)
+done < <(find "$TARGET_DIR" -maxdepth 6 \
+             -not -path "*/.*" \
+             -not -path "*/recovery/*" \
+             -not -name "recovery_report_*.txt" \
+             -type f -print0 2>/dev/null)
 
 if [[ ${#CORRUPT_FILES[@]} -eq 0 ]]; then
     echo -e "  ${GREEN}No obviously corrupt files detected.${NC}"
@@ -379,7 +382,7 @@ for f in "${!CORRUPT_FILES[@]}"; do
     echo "  Ext      : $ext"      >> "$REPORT"
 
     case "$ext" in
-        jpg|jpeg|png|gif|bmp|webp|tiff|tif)
+        jpg|jpeg|png|gif|bmp|webp|heic|heif|tiff|tif)
             attempt_image "$f" "$ext" ;;
         mp4|m4v|avi|mkv|mov|wmv|flv|webm|mpeg|mpg)
             attempt_video "$f" "$ext" ;;
