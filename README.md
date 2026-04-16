@@ -46,7 +46,7 @@ A modular suite of Bash scripts designed for system maintenance, security auditi
    ```
 ---
 
-## How to Execute
+
 
 All maintenance and diagnostic scripts require **root privileges** (sudo) to interact with hardware and system logs.
 
