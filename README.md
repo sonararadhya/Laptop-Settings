@@ -16,6 +16,7 @@ A modular suite of Bash scripts designed for system maintenance, security auditi
 | **`auto_cursor.sh`** | **UI/UX** | Automatically cycles through XFCE cursors every 2 seconds. | ✅ Stable |
 
 ---
+<<<<<<< feature-wifi-fix
 
 ## Key Features
 
@@ -55,3 +56,6 @@ Before applying any fixes, see what the script *would* do using the dry-run flag
 ```bash
 sudo ./wifi_troubleshoot.sh --dry-run
 
+=======
+*📝 Last maintained: April 16, 2026 at 16:16 UTC*
+>>>>>>> main
