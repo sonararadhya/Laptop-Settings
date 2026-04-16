@@ -69,7 +69,7 @@ else
 fi
 
 
-# --- PHASE 3: SERVICE REFRESH (NETWORKMANAGER) ---
+# --- SERVICE REFRESH (NETWORKMANAGER) ---
 section "REFRESHING NETWORK SERVICES"
 
 log_info "Toggling Wi-Fi radio via nmcli..."
@@ -122,7 +122,7 @@ fi
 
 
 
-# --- PHASE 5: CONNECTIVITY TEST ---
+# --- CONNECTIVITY TEST ---
 section "TESTING CONNECTIVITY"
 
 log_info "Refreshing DHCP lease for $WIFI_IFACE..."
