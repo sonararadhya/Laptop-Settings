@@ -19,6 +19,7 @@ BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 log_info() { echo -e "${BLUE}[i]${NC} $1"; }
 log_ok()   { echo -e "${GREEN}[✓]${NC} $1"; }
 log_fail() { echo -e "${RED}[✗]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[!]${NC} $1"; }   # FIX: was missing, caused unbound command errors
 section()  { echo -e "\n${CYAN}${BOLD}[*] $1${NC}"; }
 
 # Root Check
@@ -57,6 +58,8 @@ if [ -n "$SOFT_BLOCK" ]; then
         rfkill unblock wifi
         log_ok "Software blocks released."
     fi
+else
+    log_ok "No software locks detected."
 fi
 
 if [ -n "$HARD_BLOCK" ]; then
@@ -121,7 +124,6 @@ else
 fi
 
 
-
 # --- CONNECTIVITY TEST ---
 section "TESTING CONNECTIVITY"
 
@@ -148,10 +150,14 @@ else
 fi
 
 # --- FINAL SUMMARY ---
+# FIX: Use printf to build padded lines so the box never overflows
+IFACE_DISPLAY="${WIFI_IFACE:-Unknown}"
+DRIVER_DISPLAY="${WIFI_DRIVER:-Unknown}"
+
 echo -e "\n${BOLD}${CYAN}╔══════════════════════════════════════════════════════╗"
-echo -e "║  WIFI TROUBLESHOOTING COMPLETE                       ║"
-echo -e "║  Interface: $WIFI_IFACE                              ║"
-echo -e "║  Driver:    ${WIFI_DRIVER:-Unknown}                  ║"
+printf "${BOLD}${CYAN}║  %-52s║\n" "WIFI TROUBLESHOOTING COMPLETE"
+printf "${BOLD}${CYAN}║  Interface : %-40s║\n" "$IFACE_DISPLAY"
+printf "${BOLD}${CYAN}║  Driver    : %-40s║\n" "$DRIVER_DISPLAY"
 echo -e "║                                                      ║"
 echo -e "║  Status: Check the NetworkManager applet to connect. ║"
 echo -e "╚══════════════════════════════════════════════════════╝${NC}"
