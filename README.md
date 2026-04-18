@@ -6,6 +6,7 @@ A modular suite of Bash scripts designed for system maintenance, security auditi
 
 | Script | Category | Description | Status |
 |---|---|---|---|
+| `check_deps.sh` | Setup | Audits system for required binaries and hardware capabilities. |  New |
 | `wifi_troubleshoot.sh` | Networking | Fixes wlo1/wlan0 connectivity, RFKill blocks, and driver hangs. | ✅ Stable |
 | `fix_apt.sh` | Maintenance | Safely resolves DPKG locks, broken dependencies, and update errors. | ✅ Stable |
 | `log_analyzer.sh` | Security | Audits failed logins, sudo usage, and kernel health logs. | ✅ Stable |
@@ -53,10 +54,5 @@ Before applying any fixes, see what the script would do using the dry-run flag:
 ```bash
 sudo ./wifi_troubleshoot.sh --dry-run
 ```
-
----
-
-*📝 Last maintained: April 17, 2026*
-
 ---
 *📝 Last maintained: April 18, 2026 at 16:43 UTC*
