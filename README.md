@@ -56,4 +56,4 @@ sudo ./wifi_troubleshoot.sh --dry-run
 ```
 
 ---
-*📝 Last maintained: April 18, 2026 at 01:11 UTC*
+
