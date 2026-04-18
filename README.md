@@ -54,6 +54,5 @@ Before applying any fixes, see what the script would do using the dry-run flag:
 ```bash
 sudo ./wifi_troubleshoot.sh --dry-run
 ```
-
 ---
-
+*📝 Last maintained: April 18, 2026 at 16:43 UTC*
