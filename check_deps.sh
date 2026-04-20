@@ -15,7 +15,8 @@ section()  { echo -e "\n${CYAN}${BOLD}[*] $1${NC}"; }
 
 # --- TOOL DEFINITIONS ---
 CORE_TOOLS=("grep" "awk" "sed" "sudo")
-WIFI_TOOLS=("iw" "nmcli" "rfkill" "ethtool" "dhclient")
+HARDWARE_TOOLS=("brightnessctl" "bluetoothctl")
+WIFI_TOOLS=("iw" "nmcli" "rfkill" "ethtool" "dhclient" "airmon-ng")
 APT_TOOLS=("apt" "dpkg")
 RECOVERY_TOOLS=("file")
 
@@ -35,6 +36,9 @@ declare -A BINARY_TO_PACKAGE=(
     # Package management
     ["apt"]="apt"
     ["dpkg"]="dpkg"
+    ["airmon-ng"]="aircrack-ng"
+    ["brightnessctl"]="brightnessctl"
+    ["bluetoothctl"]="bluez"
     # Recovery tools
     ["file"]="file"
 )
@@ -67,6 +71,15 @@ done
 # Networking tools
 log_info "Checking Networking Utilities..."
 for tool in "${WIFI_TOOLS[@]}"; do
+    if ! check_binary "$tool"; then
+        MISSING_BINARIES+=("$tool")
+        ((MISSING_COUNT++))
+    fi
+done
+
+# Hardware management tools
+log_info "Checking Hardware Management Utilities..."
+for tool in "${HARDWARE_TOOLS[@]}"; do
     if ! check_binary "$tool"; then
         MISSING_BINARIES+=("$tool")
         ((MISSING_COUNT++))
