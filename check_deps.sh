@@ -14,7 +14,7 @@ log_warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 section()  { echo -e "\n${CYAN}${BOLD}[*] $1${NC}"; }
 
 # --- TOOL DEFINITIONS ---
-CORE_TOOLS=("grep" "awk" "sed" "sudo")
+CORE_TOOLS=("grep" "awk" "sed" "sudo" "tcpdump")
 HARDWARE_TOOLS=("brightnessctl" "bluetoothctl")
 WIFI_TOOLS=("iw" "nmcli" "rfkill" "ethtool" "dhclient" "airmon-ng")
 APT_TOOLS=("apt" "dpkg")
@@ -27,6 +27,7 @@ declare -A BINARY_TO_PACKAGE=(
     ["awk"]="gawk"
     ["sed"]="sed"
     ["sudo"]="sudo"
+    ["tcpdump"]="tcpdump"
     # Networking tools
     ["iw"]="iw"
     ["nmcli"]="network-manager"
