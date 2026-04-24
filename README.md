@@ -6,7 +6,11 @@ A modular suite of Bash scripts designed for system maintenance, security auditi
 
 | Script | Category | Description | Status |
 |---|---|---|---|
-| `check_deps.sh` | Setup | Audits system for required binaries and hardware capabilities. |  New |
+| `setup.sh` | Orchestration | Master installer that configures permissions and resolves all dependencies. | New |
+| `check_deps.sh` | Setup | Audits system for required binaries and hardware capabilities. | New |
+| `network_dashboard.sh` | Security | Live traffic analytics dashboard tracking packet counts and "Top Talker" IPs. | Stable |
+| `battery_optimize.sh` | Hardware | "Eco-Mode" for laptops: health audits, brightness control, and service management. | Stable |
+| `system_cleanup.sh` | Maintainance | Emergency recovery tool to restore network states and clear system locks. | Stable |
 | `wifi_troubleshoot.sh` | Networking | Fixes wlo1/wlan0 connectivity, RFKill blocks, and driver hangs. | ✅ Stable |
 | `fix_apt.sh` | Maintenance | Safely resolves DPKG locks, broken dependencies, and update errors. | ✅ Stable |
 | `log_analyzer.sh` | Security | Audits failed logins, sudo usage, and kernel health logs. | ✅ Stable |
@@ -56,4 +60,4 @@ sudo ./wifi_troubleshoot.sh --dry-run
 ```
 
 ---
-*📝 Last maintained: April 20, 2026 at 13:52 UTC*
+*📝 Last maintained: April 24, 2026 at 13:52 UTC*
