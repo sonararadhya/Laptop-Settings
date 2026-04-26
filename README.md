@@ -6,7 +6,8 @@ A modular suite of Bash scripts designed for system maintenance, security auditi
 
 | Script | Category | Description | Status |
 |---|---|---|---|
-| `setup.sh` | Orchestration | Master installer that configures permissions and resolves all dependencies. | New |
+| 'toolkit_monitor.sh' | Monitoring | Always-on systemd daemon for real-time health & connectivity logging. | New |
+| `setup.sh` | Orchestration | Master installer that configures permissions and resolves all dependencies. | Stable |
 | `check_deps.sh` | Setup | Audits system for required binaries and hardware capabilities. | New |
 | `network_dashboard.sh` | Security | Live traffic analytics dashboard tracking packet counts and "Top Talker" IPs. | Stable |
 | `battery_optimize.sh` | Hardware | "Eco-Mode" for laptops: health audits, brightness control, and service management. | Stable |
@@ -60,4 +61,32 @@ sudo ./wifi_troubleshoot.sh --dry-run
 ```
 
 ---
-*📝 Last maintained: April 24, 2026 at 13:52 UTC*
+
+### 5. Monitoring & Persistence
+
+The toolkit includes a background health monitor that runs as a systemd service. This ensures your system stays under audit even when the terminal is closed.
+
+#### Service Management
+The setup.sh orchestrator automatically generates and installs the toolkit-monitor.service. You can manage it using standard system commands:
+
+1. Check Status: ```bash 
+sudo systemctl status toolkit-monitor.service
+
+2. View Live Logs: ```bash 
+tail -f /var/log/toolkit_monitor.log
+
+3. Restart Service: ```bash
+sudo systemctl restart toolkit-monitor.service
+
+```
+
+#### Event Logging
+The daemon tracks the following events in /var/log/toolkit_monitor.log:
+
+1. [CRITICAL] Disk usage exceeding 90%
+
+2. [WARNING] Network connectivity drops
+
+3. [ALERT] Low battery states (<15%)
+
+*📝 Last maintained: April 26, 2026 at 20:22 UTC*
