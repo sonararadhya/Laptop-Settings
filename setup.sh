@@ -221,6 +221,47 @@ else
     fi
 fi
 
+
+# --- SERVICE INSTALLATION ---
+section "BACKGROUND MONITORING SERVICE"
+
+SERVICE_NAME="toolkit-monitor.service"
+SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
+DAEMON_PATH="$(pwd)/toolkit_monitor.sh"
+
+read -p "Install background health-monitor service? (y/n): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    log_info "Creating systemd unit file..."
+    
+    # Generate the service file dynamically with the correct path
+    cat <<EOF > $SERVICE_NAME
+[Unit]
+Description=Kali Toolkit System Health Monitor
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/bash $DAEMON_PATH
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Move to system directory and enable
+    mv $SERVICE_NAME $SERVICE_PATH
+    systemctl daemon-reload
+    systemctl enable $SERVICE_NAME
+    systemctl start $SERVICE_NAME
+    
+    log_ok "Service installed and started successfully."
+    log_info "Monitor logs: tail -f /var/log/toolkit_monitor.log"
+else
+    log_info "Skipping background service installation."
+fi
+
+
 # =============================================================
 #  FINAL VERIFICATION
 # =============================================================
