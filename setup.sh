@@ -2,7 +2,7 @@
 # ============================================================
 #  setup.sh --- Toolkit Orchestrator & Installer
 #  The entry point for the Laptop-Settings environment.
-#  Version: 3.1 (Minor fixes applied)
+#  Version: 3.3 (Path quoting + final systemctl guard applied)
 # ============================================================
 
 # [C3] Strict mode: exit on error, undefined vars, pipe failures
@@ -29,6 +29,16 @@ section() {
 
 log_action() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+log_info() {
+    echo -e "${BLUE}[i] $1${NC}"
+    log_action "INFO: $1"
+}
+
+log_ok() {
+    echo -e "${GREEN}[✓] $1${NC}"
+    log_action "SUCCESS: $1"
 }
 
 error_exit() {
@@ -100,6 +110,10 @@ log_action "Setup initiated by: ${SUDO_USER:-root}"
 
 # Must run from the toolkit root directory
 [ -f "./setup.sh" ] || error_exit "Must be run from the toolkit root directory!"
+
+# Store the absolute path to the toolkit directory
+TOOLKIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+log_action "Toolkit directory: $TOOLKIT_DIR"
 
 # [M2] Debian check — now asks explicitly before continuing on foreign OS
 if [ ! -f /etc/debian_version ]; then
@@ -221,46 +235,158 @@ else
     fi
 fi
 
+# =============================================================
+#  BACKGROUND MONITORING SERVICE INSTALLATION
+# =============================================================
 
-# --- SERVICE INSTALLATION ---
 section "BACKGROUND MONITORING SERVICE"
 
 SERVICE_NAME="toolkit-monitor.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
-DAEMON_PATH="$(pwd)/toolkit_monitor.sh"
+DAEMON_SCRIPT="toolkit_monitor.sh"
+DAEMON_PATH="$TOOLKIT_DIR/$DAEMON_SCRIPT"
 
-read -p "Install background health-monitor service? (y/n): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    log_info "Creating systemd unit file..."
-    
-    # Generate the service file dynamically with the correct path
-    cat <<EOF > $SERVICE_NAME
+# Pre-flight validation for service installation
+validate_service_prereqs() {
+    # Check if systemd is available
+    if ! command -v systemctl &>/dev/null; then
+        echo -e "${YELLOW}[!] systemd not detected. Skipping service installation.${NC}"
+        log_action "Service installation skipped: systemd not available"
+        return 1
+    fi
+
+    # Check if daemon script exists
+    if [ ! -f "$DAEMON_PATH" ]; then
+        echo -e "${YELLOW}[!] Daemon script not found: $DAEMON_PATH${NC}"
+        log_action "Service installation skipped: daemon script missing"
+        return 1
+    fi
+
+    # Verify daemon script has shebang
+    if ! head -n 1 "$DAEMON_PATH" | grep -Eq '^#!.*bash'; then
+        echo -e "${YELLOW}[!] Daemon script missing shebang or invalid format${NC}"
+        log_action "Service installation skipped: invalid daemon script"
+        return 1
+    fi
+
+    # [FIX] Reject paths with spaces — systemd ExecStart does not support
+    # shell quoting, so a space in the daemon path would cause the unit to
+    # fail at start time with no obvious error. Catch this early.
+    if [[ "$DAEMON_PATH" == *" "* ]]; then
+        echo -e "${YELLOW}[!] Daemon path contains spaces: $DAEMON_PATH${NC}"
+        echo -e "${YELLOW}    Move the toolkit to a path without spaces before installing the service.${NC}"
+        log_action "Service installation skipped: spaces in daemon path"
+        return 1
+    fi
+
+    return 0
+}
+
+# Only proceed if validation passes
+if validate_service_prereqs; then
+    echo -e "${BLUE}[i] Found daemon script: $DAEMON_SCRIPT${NC}"
+    read -rp "Install background health-monitor service? (type 'yes' to confirm): " service_confirm
+
+    if [[ "$service_confirm" == "yes" ]]; then
+        log_info "Creating systemd unit file..."
+
+        # Generate the service file with absolute path.
+        # Note: systemd does NOT interpret shell quoting in ExecStart — the
+        # entire value after the binary is passed as-is. Spaces in the path
+        # are rejected above so we can safely expand $DAEMON_PATH here.
+        cat > "$SERVICE_NAME" <<EOF
 [Unit]
-Description=Kali Toolkit System Health Monitor
-After=network.target
+Description=Toolkit System Health Monitor
+Documentation=file://$TOOLKIT_DIR/README.md
+After=network-online.target
+Wants=network-online.target
 
 [Service]
+Type=simple
 ExecStart=/usr/bin/bash $DAEMON_PATH
-Restart=always
-User=root
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    # Move to system directory and enable
-    mv $SERVICE_NAME $SERVICE_PATH
-    systemctl daemon-reload
-    systemctl enable $SERVICE_NAME
-    systemctl start $SERVICE_NAME
-    
-    log_ok "Service installed and started successfully."
-    log_info "Monitor logs: tail -f /var/log/toolkit_monitor.log"
-else
-    log_info "Skipping background service installation."
-fi
+        # Validate generated service file
+        if [ ! -s "$SERVICE_NAME" ]; then
+            error_exit "Failed to generate service file"
+        fi
 
+        # Move to system directory
+        # Note: temp-file-then-mv is intentional here (atomic from the
+        # perspective of the systemd directory; lets us validate before
+        # committing). The 'tee directly to SERVICE_PATH' pattern provides
+        # no benefit and requires root at every write — keep this approach.
+        if ! mv "$SERVICE_NAME" "$SERVICE_PATH" 2>/dev/null; then
+            rm -f "$SERVICE_NAME"
+            error_exit "Failed to install service file to $SERVICE_PATH"
+        fi
+
+        log_info "Service file installed to $SERVICE_PATH"
+
+        # Reload systemd and enable service
+        if systemctl daemon-reload 2>/dev/null; then
+            log_ok "systemd configuration reloaded"
+        else
+            rm -f "$SERVICE_PATH"
+            error_exit "Failed to reload systemd daemon"
+        fi
+
+        if systemctl enable "$SERVICE_NAME" 2>/dev/null; then
+            log_ok "Service enabled for auto-start"
+        else
+            systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+            rm -f "$SERVICE_PATH"
+            systemctl daemon-reload 2>/dev/null || true
+            error_exit "Failed to enable service"
+        fi
+
+        # Start the service
+        if systemctl start "$SERVICE_NAME" 2>/dev/null; then
+            log_ok "Service started successfully"
+            log_action "Service $SERVICE_NAME installed and started"
+
+            # Give it a moment to start
+            sleep 2
+
+            # Verify it's running
+            if systemctl is-active --quiet "$SERVICE_NAME"; then
+                log_ok "Service is running"
+                echo -e "${CYAN}Monitor logs with: ${BOLD}tail -f /var/log/toolkit_monitor.log${NC}"
+            else
+                echo -e "${YELLOW}[!] Service started but may have issues. Check status:${NC}"
+                echo -e "${CYAN}    systemctl status $SERVICE_NAME${NC}"
+                log_action "WARNING: Service started but status uncertain"
+            fi
+        else
+            # Cleanup on failure
+            systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+            rm -f "$SERVICE_PATH"
+            systemctl daemon-reload 2>/dev/null || true
+            error_exit "Failed to start service"
+        fi
+
+    else
+        log_info "Skipping background service installation."
+        log_action "Service installation declined by user"
+    fi
+else
+    # Validation failed - already logged
+    :
+fi
 
 # =============================================================
 #  FINAL VERIFICATION
@@ -296,6 +422,14 @@ echo -e "${BLUE}Next steps:${NC}"
 echo -e "  • Start with:      ${CYAN}sudo bash network_dashboard.sh${NC}"
 echo -e "  • View logs:       ${CYAN}sudo cat $LOG_FILE${NC}"
 echo -e "  • Check deps:      ${CYAN}bash check_deps.sh${NC}"
+
+# [FIX] Guard systemctl with availability check — validate_service_prereqs
+# already checked this for the install path, but this final status check
+# runs unconditionally and would error on non-systemd systems.
+if command -v systemctl >/dev/null 2>&1 \
+    && systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null; then
+    echo -e "  • Service status:  ${CYAN}systemctl status $SERVICE_NAME${NC}"
+fi
 
 log_action "Setup completed"
 exit 0
